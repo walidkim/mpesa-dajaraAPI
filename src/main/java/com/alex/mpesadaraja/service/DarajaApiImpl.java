@@ -1,9 +1,12 @@
 package com.alex.mpesadaraja.service;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.alex.mpesadaraja.config;
 import com.alex.mpesadaraja.dtos.AccessTokenResponse;
+import com.alex.mpesadaraja.dtos.failedSTKResponse;
 import com.alex.mpesadaraja.dtos.sendSTKResponse;
 import com.alex.mpesadaraja.utils.HelperUtility;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,7 +51,7 @@ public class DarajaApiImpl implements DarajaApi {
 
     // STK Request
 
-    public sendSTKResponse sendSTK(String phoneNo, int amount) {
+    public ResponseEntity<String> sendSTK(String phoneNo, int amount) {
         phoneNo = "254" + phoneNo;
         try {
             final String authheader = "\"Bearer " + getAccessToken() + "\"";
@@ -60,19 +63,19 @@ public class DarajaApiImpl implements DarajaApi {
             StringBuilder stkbody = new StringBuilder();
             stkbody.append("{\"BusinessShortCode\":" + config.shortCode + ",");
             stkbody.append("\"Password\": \"" + password + "\",");
-            stkbody.append("\"Timestamp\": \"" + HelperUtility.getTimeStamp() + "\",");
+            stkbody.append("\"Timesamp\": \"" + HelperUtility.getTimeStamp() + "\",");
             stkbody.append("\"TransactionType\": \"CustomerPayBillOnline\",");
             stkbody.append("\"Amount\":" + amount + ",");
             stkbody.append("\"PartyA\": " + phoneNo + ",");
             stkbody.append("\"PartyB\":" + config.shortCode + ",");
             stkbody.append("\"PhoneNumber\": " + phoneNo + ",");
             stkbody.append("\"CallBackURL\": \"" + config.callBackURL + "\",");
-            stkbody.append("\"AccountReference\": \"CompanyXLTD\",");
+            stkbody.append("\"AccountReference\": \"Kenya Revenue Authority\",");
             stkbody.append("\"TransactionDesc\": \"Payment for Daraja Test\"}");
 
             OkHttpClient client = new OkHttpClient().newBuilder().build();
             RequestBody requestBody = RequestBody.create(stkbody.toString(), MediaType.parse("application/json"));
-            System.out.println(stkbody.toString());
+        
 
             Request request = new Request.Builder()
                     .url(config.stkPushURL)
@@ -82,11 +85,22 @@ public class DarajaApiImpl implements DarajaApi {
                     .build();
 
             Response response = client.newCall(request).execute();
+            String responseBodyString = response.body().string();
 
-            return objectMapper.readValue(response.body().string(), sendSTKResponse.class);
+                ObjectMapper objectMapper = new ObjectMapper();     
+                 sendSTKResponse SuccessResponse= objectMapper.readValue(responseBodyString, sendSTKResponse.class);
+            failedSTKResponse failedResponse=objectMapper.readValue(responseBodyString, failedSTKResponse.class);
+            if( SuccessResponse.getCheckoutRequestID()!=null) {
+
+                System.out.println("S Responsecode:"+SuccessResponse.getCheckoutRequestID());
+                return ResponseEntity.status(HttpStatus.OK).body( responseBodyString);
+            }else{
+                
+                return ResponseEntity.status(HttpStatus.OK).body(responseBodyString);
+            }
         } catch (Exception e) {
             System.out.println("Error occured" + e);
-            return null;
+            return ResponseEntity.status(HttpStatus.OK).body("Error occured");
         }
     }
 
