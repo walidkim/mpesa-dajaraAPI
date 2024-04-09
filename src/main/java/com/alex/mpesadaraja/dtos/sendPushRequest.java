@@ -3,15 +3,14 @@ package com.alex.mpesadaraja.dtos;
 import lombok.Data;
 
 @Data
-public class sendSTKRequest {
+public class sendPushRequest {
 
     private String phoneNo;
-    private int amount;
-    public sendSTKRequest(String phoneNo, int amount) {
+    private String amount;
+
+    public sendPushRequest(String phoneNo, String amount) {
         this.phoneNo = phoneNo;
         this.amount = amount;
     }
-
-    
 
 }

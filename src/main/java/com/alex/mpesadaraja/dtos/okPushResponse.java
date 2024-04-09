@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.Data;
 import lombok.SneakyThrows;
+
 @Data
-public class sendSTKResponse {
+public class okPushResponse {
+
     @JsonProperty("MerchantRequestID")
     private String MerchantRequestID;
     @JsonProperty("CheckoutRequestID")
@@ -17,8 +19,6 @@ public class sendSTKResponse {
     private String ResponseDescription;
     @JsonProperty("CustomerMessage")
     private String CustomerMessage;
-    @JsonProperty("requestId")
-    private String requestId;
 
     @SneakyThrows
     @Override
