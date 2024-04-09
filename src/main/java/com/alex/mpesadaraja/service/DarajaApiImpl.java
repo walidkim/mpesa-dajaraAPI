@@ -6,8 +6,9 @@ import org.springframework.stereotype.Service;
 
 import com.alex.mpesadaraja.config;
 import com.alex.mpesadaraja.dtos.AccessTokenResponse;
-import com.alex.mpesadaraja.dtos.failedSTKResponse;
-import com.alex.mpesadaraja.dtos.sendSTKResponse;
+import com.alex.mpesadaraja.dtos.errorPushResponse;
+import com.alex.mpesadaraja.dtos.okPushResponse;
+import com.alex.mpesadaraja.dtos.callback.StkCallbackRequest;
 import com.alex.mpesadaraja.utils.HelperUtility;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -54,28 +55,25 @@ public class DarajaApiImpl implements DarajaApi {
     public ResponseEntity<String> sendSTK(String phoneNo, int amount) {
         phoneNo = "254" + phoneNo;
         try {
-            final String authheader = "\"Bearer " + getAccessToken() + "\"";
+            final String authheader = "Bearer " + getAccessToken();
             assert phoneNo != null && amount > 0 : "Enter proper phone number and amount!!";
             String password = HelperUtility
                     .toBase64String(config.shortCode + config.passkey + HelperUtility.getTimeStamp());
-            System.out.println(password);
 
-            StringBuilder stkbody = new StringBuilder();
-            stkbody.append("{\"BusinessShortCode\":" + config.shortCode + ",");
-            stkbody.append("\"Password\": \"" + password + "\",");
-            stkbody.append("\"Timesamp\": \"" + HelperUtility.getTimeStamp() + "\",");
-            stkbody.append("\"TransactionType\": \"CustomerPayBillOnline\",");
-            stkbody.append("\"Amount\":" + amount + ",");
-            stkbody.append("\"PartyA\": " + phoneNo + ",");
-            stkbody.append("\"PartyB\":" + config.shortCode + ",");
-            stkbody.append("\"PhoneNumber\": " + phoneNo + ",");
-            stkbody.append("\"CallBackURL\": \"" + config.callBackURL + "\",");
-            stkbody.append("\"AccountReference\": \"Kenya Revenue Authority\",");
-            stkbody.append("\"TransactionDesc\": \"Payment for Daraja Test\"}");
+            String stkBody = "{\"BusinessShortCode\":" + config.shortCode + ",";
+            stkBody += "\"Password\": \"" + password + "\",";
+            stkBody += "\"Timestamp\": \"" + HelperUtility.getTimeStamp() + "\",";
+            stkBody += "\"TransactionType\": \"CustomerPayBillOnline\",";
+            stkBody += "\"Amount\":" + amount + ",";
+            stkBody += "\"PartyA\": " + phoneNo + ",";
+            stkBody += "\"PartyB\":" + config.shortCode + ",";
+            stkBody += "\"PhoneNumber\": " + phoneNo + ",";
+            stkBody += "\"CallBackURL\": \"" + config.callBackURL + "\",";
+            stkBody += "\"AccountReference\": \"CompanyXLTD\",";
+            stkBody += "\"TransactionDesc\": \"Payment for Daraja Test\"}";
 
-            OkHttpClient client = new OkHttpClient().newBuilder().build();
-            RequestBody requestBody = RequestBody.create(stkbody.toString(), MediaType.parse("application/json"));
-        
+            OkHttpClient client = new OkHttpClient();
+            RequestBody requestBody = RequestBody.create(stkBody, MediaType.parse("application/json"));
 
             Request request = new Request.Builder()
                     .url(config.stkPushURL)
@@ -85,23 +83,41 @@ public class DarajaApiImpl implements DarajaApi {
                     .build();
 
             Response response = client.newCall(request).execute();
-            String responseBodyString = response.body().string();
+            String responseBody = response.body().string();
 
-                ObjectMapper objectMapper = new ObjectMapper();     
-                 sendSTKResponse SuccessResponse= objectMapper.readValue(responseBodyString, sendSTKResponse.class);
-            failedSTKResponse failedResponse=objectMapper.readValue(responseBodyString, failedSTKResponse.class);
-            if( SuccessResponse.getCheckoutRequestID()!=null) {
-
-                System.out.println("S Responsecode:"+SuccessResponse.getCheckoutRequestID());
-                return ResponseEntity.status(HttpStatus.OK).body( responseBodyString);
-            }else{
-                
-                return ResponseEntity.status(HttpStatus.OK).body(responseBodyString);
+            if (response.isSuccessful()) {
+                okPushResponse okPushResponse = objectMapper.readValue(responseBody, okPushResponse.class);
+                System.out.println(okPushResponse.getResponseCode());
+                if ("0".equals(okPushResponse.getResponseCode())) {
+                    return ResponseEntity.ok().body("STK Push successful:  " + okPushResponse.toString());
+                } else {
+                    return ResponseEntity.ok().body("STK Push failed: " + okPushResponse.getResponseDescription());
+                }
+            } else {
+                errorPushResponse errorPushResponse = objectMapper.readValue(responseBody, errorPushResponse.class);
+                return ResponseEntity.ok().body("STK Push failed:   " + errorPushResponse.toString());
             }
         } catch (Exception e) {
-            System.out.println("Error occured" + e);
-            return ResponseEntity.status(HttpStatus.OK).body("Error occured");
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error occurred");
         }
     }
 
+    public void CallBack throws Exception
+    {
+        // Sample JSON response
+        String jsonResponse = "{ \"Body\": { \"stkCallback\": { \"MerchantRequestID\": \"29115-34620561-1\", \"CheckoutRequestID\": \"ws_CO_191220191020363925\", \"ResultCode\": 0, \"ResultDesc\": \"The service request is processed successfully.\", \"CallbackMetadata\": { \"Item\": [ { \"Name\": \"Amount\", \"Value\": 1.00 }, { \"Name\": \"MpesaReceiptNumber\", \"Value\": \"NLJ7RT61SV\" }, { \"Name\": \"TransactionDate\", \"Value\": 20191219102115 }, { \"Name\": \"PhoneNumber\", \"Value\": 254708374149 } ] } } } }";
+
+        // Create ObjectMapper instance
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        // Deserialize JSON response into StkCallbackRequest object
+        StkCallbackRequest stkCallbackRequest = objectMapper.readValue(jsonResponse, StkCallbackRequest.class);
+
+        // Now you can access the parsed data
+        StkCallback stkCallback = stkCallbackRequest.getBody().getStkCallback();
+        System.out.println("Merchant Request ID: " + stkCallback.getMerchantRequestId());
+        System.out.println("Checkout Request ID: " + stkCallback.getCheckoutRequestId());
+        // Similarly, access other fields as needed
+    }
 }
